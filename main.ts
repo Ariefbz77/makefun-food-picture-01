@@ -1,7 +1,8 @@
 // make.fun food-picture-01 entry (Node 22, standard library only).
 //
 // The entry image sits beside this file as entry.png. The program copies it
-// to /output/entry.png, where the grader reads it and the judge sees it.
+// to /output/entry.png, where the grader reads it and the judge sees it,
+// then verifies the copy is a whole, valid image before it exits.
 //
 // The image: a steaming bowl of ramen — chopsticks lifting glossy noodles,
 // a halved soft egg, slices of chashu — shot close so the food fills the
@@ -9,10 +10,33 @@
 //
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+//
+// The copy is byte-for-byte deterministic, so both grader runs write the
+// same bytes. A JPEG or a PNG is accepted (told apart by its first bytes);
+// the name stays entry.png either way.
 
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_MAGIC = Buffer.from([0xff, 0xd8, 0xff]);
+const MAX_BYTES = 1048576; // 1 MiB, the competition's size cap
+
 const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const src = new URL('./entry.png', import.meta.url);
+const dest = join(outDir, 'entry.png');
+
 mkdirSync(outDir, { recursive: true });
-copyFileSync(new URL('./entry.png', import.meta.url), join(outDir, 'entry.png'));
+copyFileSync(src, dest);
+
+// Verify the copy: a whole image within the size cap, PNG or JPEG by magic.
+const bytes = readFileSync(dest);
+const size = statSync(dest).size;
+if (size > MAX_BYTES) {
+  throw new Error(`entry.png is ${size} bytes, over the ${MAX_BYTES} byte cap`);
+}
+const isPng = bytes.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC);
+const isJpeg = bytes.subarray(0, JPEG_MAGIC.length).equals(JPEG_MAGIC);
+if (!isPng && !isJpeg) {
+  throw new Error('entry.png is neither a PNG nor a JPEG by its first bytes');
+}
