@@ -40,3 +40,11 @@ const isJpeg = bytes.subarray(0, JPEG_MAGIC.length).equals(JPEG_MAGIC);
 if (!isPng && !isJpeg) {
   throw new Error('entry.png is neither a PNG nor a JPEG by its first bytes');
 }
+// Whole image, not a truncated one: a PNG must end with its IEND chunk,
+// a JPEG with its end marker (FF D9), per the competition's gate rules.
+if (isPng && !bytes.subarray(bytes.length - 12).includes(Buffer.from('IEND'))) {
+  throw new Error('entry.png is a truncated PNG: no IEND chunk at the end');
+}
+if (isJpeg && !(bytes[bytes.length - 2] === 0xff && bytes[bytes.length - 1] === 0xd9)) {
+  throw new Error('entry.png is a truncated JPEG: no end marker (FF D9)');
+}
